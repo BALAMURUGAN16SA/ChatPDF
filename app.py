@@ -178,6 +178,9 @@ def main():
 
     st.markdown('<div class="title-bar">💬 Dbaas - ChatPDF</div>', unsafe_allow_html=True)
 
+    if ("pdfs" not in st.session_state or not st.session_state.get("pdfs")):
+        st.markdown("### Upload docs using the button in sidebar")
+
     with st.sidebar:
         st.header("📁 Upload PDFs")
         pdfs = st.file_uploader("Choose PDF files", type="pdf", accept_multiple_files=True)
