@@ -11,7 +11,6 @@ from langchain_community.vectorstores.faiss import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 
-
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
@@ -43,12 +42,16 @@ def conversational_chain():
 Answer the question as detailed as possible using the provided context and previous conversation history.
 If the answer is not in the provided context, just say "Answer not available in the context".
 
+
 Previous Conversation:
 {chat_history}
 
+
 Context: {context}
 
+
 Question: {question}
+
 
 Answer:
 """
@@ -178,34 +181,50 @@ def main():
 
     st.markdown('<div class="title-bar">💬 Dbaas - ChatPDF</div>', unsafe_allow_html=True)
 
+    # Message before upload
+    if "pdfs" not in st.session_state or not st.session_state["pdfs"]:
+        st.markdown("📂 Upload docs using the button in sidebar")
+
     with st.sidebar:
         st.header("📁 Upload PDFs")
-        pdfs = st.file_uploader("Choose PDF files", type="pdf", accept_multiple_files=True)
+        uploaded_pdfs = st.file_uploader("Choose PDF files", type="pdf", accept_multiple_files=True)
+
+        if uploaded_pdfs:
+            st.session_state["pdfs"] = uploaded_pdfs
+            st.markdown(f"**{len(uploaded_pdfs)} file(s) selected**")
+        else:
+            if "pdfs" in st.session_state:
+                del st.session_state["pdfs"]
+
         process = st.button("Process Documents", key="process_button")
-        if pdfs:
-            st.markdown(f"**{len(pdfs)} file(s) selected**")
 
         if "processed" in st.session_state and st.session_state.processed:
             st.success("✅ Documents processed and indexed!")
 
         st.markdown("---")
 
-    if pdfs and process:
+    # Process PDFs after pressing button
+    if "pdfs" in st.session_state and st.session_state["pdfs"] and process:
         with st.spinner("📝 Processing PDFs and building index..."):
-            raw_text = extract_texts_from_pdfs(pdfs)
+            raw_text = extract_texts_from_pdfs(st.session_state["pdfs"])
             chunks = make_chunks(raw_text)
             vectorization(chunks)
         st.session_state.processed = True
+
         summary_question = "summarize the pdf"
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
         st.session_state.chat_history.append({"role": "user", "content": summary_question})
         with st.spinner("🧠 Generating summary..."):
             answer = get_bot_response(summary_question, st.session_state.chat_history)
         st.session_state.chat_history.append({"role": "assistant", "content": answer})
         st.rerun()
 
+    # Initialize chat history
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
+    # Display chat messages
     for chat in st.session_state.chat_history:
         role = chat["role"]
         content = chat["content"]
@@ -213,6 +232,7 @@ def main():
         with st.chat_message(role):
             st.markdown(f"{prefix}  {content}")
 
+    # User input
     user_input = st.chat_input("Ask a question about the PDF(s):")
     if user_input:
         st.session_state.chat_history.append({"role": "user", "content": user_input})
