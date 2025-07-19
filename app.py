@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from duckduckgo_search import DDGS
 
 import streamlit as st
 from PyPDF2 import PdfReader
@@ -39,31 +40,66 @@ def vectorization(chunks):
 
 def conversational_chain():
     prompt_template = """
-Answer the question as detailed as possible using the provided context and previous conversation history.
-If the answer is not in the provided context, just say "Answer not available in the context".
-
-
-Previous Conversation:
-{chat_history}
-
-
-Context: {context}
-
-
-Question: {question}
-
-
-Answer:
-"""
+    Answer the question as detailed as possible using the provided context and previous conversation history.
+    If the answer is not in the provided context, just say "WEB_SEARCH_FALLBACK".
+    Previous Conversation:{chat_history}
+    Context: {context}
+    Question: {question}
+    Answer:
+    """
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question", "chat_history"])
     model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3)
     return load_qa_chain(model, chain_type="stuff", prompt=prompt)
 
 
+def get_web_response(question, chat_history):
+    """Get web results with chat history context"""
+    try:
+        with DDGS() as ddgs:
+            last_3_messages = "\n".join(
+                [f"{msg['role']}: {msg['content']}" 
+                 for msg in chat_history[-3:] if msg['role'] == "user"]
+            )
+            enhanced_query = f"{question}\n\nRelevant conversation history:\n{last_3_messages}"
+            
+            results = [r for r in ddgs.text(enhanced_query, max_results=3)]
+            
+            if not results:
+                return None
+                
+            formatted_results = []
+            for result in results:
+                formatted_results.append(
+                    f"### {result['title']}\n\n"
+                    f"{result['body']}\n\n"
+                    f"[Read more]({result['href']})"
+                )
+            
+            return (
+                "⚠️ Could not find in PDFs. Here are relevant web results:\n\n"
+                + "\n\n---\n\n".join(formatted_results)
+            )
+            
+    except Exception as e:
+        print(f"Web search failed: {str(e)}")
+        return None
+
+def should_use_web_fallback(docs_and_scores):
+    if not docs_and_scores:
+        return True
+        
+    avg_score = sum(score for _, score in docs_and_scores) / len(docs_and_scores)
+    return avg_score < 0.5
+
 def get_bot_response(question, chat_history):
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     vectorstore = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
-    docs = vectorstore.similarity_search(question, k=4)
+    docs_and_scores = vectorstore.similarity_search_with_score(question, k=4)
+    docs = [doc for doc, _ in docs_and_scores]
+
+    if should_use_web_fallback(docs_and_scores):
+        web_response = get_web_response(question, chat_history)
+        return web_response if web_response else "I couldn't find relevant information."
 
     chain = conversational_chain()
     response = chain({
@@ -72,6 +108,10 @@ def get_bot_response(question, chat_history):
         "chat_history": chat_history
     }, return_only_outputs=True)
 
+    if "WEB_SEARCH_FALLBACK" in response["output_text"]:
+        web_response = get_web_response(question, chat_history)
+        return web_response if web_response else response["output_text"]
+    
     return response["output_text"]
 
 
