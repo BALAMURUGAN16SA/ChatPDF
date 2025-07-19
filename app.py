@@ -196,6 +196,11 @@ def main():
             chunks = make_chunks(raw_text)
             vectorization(chunks)
         st.session_state.processed = True
+        summary_question = "summarize the pdf"
+        st.session_state.chat_history.append({"role": "user", "content": summary_question})
+        with st.spinner("🧠 Generating summary..."):
+            answer = get_bot_response(summary_question, st.session_state.chat_history)
+        st.session_state.chat_history.append({"role": "assistant", "content": answer})
         st.rerun()
 
     if "chat_history" not in st.session_state:
