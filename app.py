@@ -1,0 +1,224 @@
+import os
+from dotenv import load_dotenv
+
+import streamlit as st
+from PyPDF2 import PdfReader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+import google.generativeai as genai
+
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_community.vectorstores.faiss import FAISS
+from langchain.chains.question_answering import load_qa_chain
+from langchain.prompts import PromptTemplate
+
+
+load_dotenv()
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+
+def extract_texts_from_pdfs(pdfs):
+    texts = ""
+    for pdf in pdfs:
+        reader = PdfReader(pdf)
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                texts += text + "\n"
+    return texts
+
+
+def make_chunks(texts):
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    return splitter.split_text(texts)
+
+
+def vectorization(chunks):
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    vector = FAISS.from_texts(chunks, embedding=embeddings)
+    vector.save_local("faiss_index")
+
+
+def conversational_chain():
+    prompt_template = """
+Answer the question as detailed as possible using the provided context and previous conversation history.
+If the answer is not in the provided context, just say "Answer not available in the context".
+
+Previous Conversation:
+{chat_history}
+
+Context: {context}
+
+Question: {question}
+
+Answer:
+"""
+    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question", "chat_history"])
+    model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3)
+    return load_qa_chain(model, chain_type="stuff", prompt=prompt)
+
+
+def get_bot_response(question, chat_history):
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    vectorstore = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+    docs = vectorstore.similarity_search(question, k=4)
+
+    chain = conversational_chain()
+    response = chain({
+        "input_documents": docs,
+        "question": question,
+        "chat_history": chat_history
+    }, return_only_outputs=True)
+
+    return response["output_text"]
+
+
+def set_custom_style():
+    st.markdown(
+        """
+<style>
+    /* Title bar styling */
+    .title-bar {
+        background-color: #00755E;
+        color: white;
+        font-size: 28px;
+        font-weight: 700;
+        padding: 14px 24px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        margin-bottom: 1.5rem;
+        user-select: none;
+        border-radius: 6px;
+    }
+
+    /* Overall background and text */
+    .stApp {
+        background-color: #000000;
+        color: #ffffff;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* Headers color */
+    h1, h2, h3, h4, h5, h6 {
+        color: #00755E !important;
+        font-weight: 700;
+    }
+
+    /* Sidebar background and text */
+    [data-testid="stSidebar"] {
+        background-color: #000000;
+        color: #00755E;
+        padding-top: 2rem;
+    }
+    [data-testid="stSidebar"] ::-webkit-scrollbar {
+        width: 8px;
+    }
+    [data-testid="stSidebar"] ::-webkit-scrollbar-thumb {
+        background-color: #004c40;
+        border-radius: 4px;
+    }
+
+    /* Sidebar headers */
+    .stSidebar h1, .stSidebar h2, .stSidebar h3, .stSidebar h4, strong {
+        color: #00755E !important;
+        font-weight: 700;
+    }
+
+    /* Input and uploader styling */
+    .stTextInput>div>div>input, .stFileUploader>div>div {
+        background-color: #111111;
+        color: #ffffff;
+        border: 1.5px solid #00755E;
+        border-radius: 6px;
+    }
+
+    /* Button styling */
+    .stButton>button {
+        background-color: #00755E;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 18px;
+        font-size: 16px;
+        font-weight: 600;
+        transition: background-color 0.2s ease;
+        width: 100%;
+        margin-top: 1rem;
+    }
+    .stButton>button:hover {
+        background-color: #005a43;
+        color: white;
+    }
+
+    /* Spinner color */
+    .stSpinner>div>div {
+        border-color: #00755E transparent transparent transparent !important;
+    }
+
+    /* Chat input styling */
+    .stChatInput>div>div>textarea {
+        background-color: #111111;
+        color: white;
+        border: 1.5px solid #00755E;
+        border-radius: 8px;
+        font-size: 16px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        padding: 12px;
+        resize: vertical;
+        min-height: 50px;
+    }
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def main():
+    set_custom_style()
+    st.set_page_config(page_title="Dbaas - ChatPDF", page_icon="📄")
+
+    st.markdown('<div class="title-bar">💬 Dbaas - ChatPDF</div>', unsafe_allow_html=True)
+
+    with st.sidebar:
+        st.header("📁 Upload PDFs")
+        pdfs = st.file_uploader("Choose PDF files", type="pdf", accept_multiple_files=True)
+        process = st.button("Process Documents", key="process_button")
+        if pdfs:
+            st.markdown(f"**{len(pdfs)} file(s) selected**")
+
+        if "processed" in st.session_state and st.session_state.processed:
+            st.success("✅ Documents processed and indexed!")
+
+        st.markdown("---")
+
+    if pdfs and process:
+        with st.spinner("📝 Processing PDFs and building index..."):
+            raw_text = extract_texts_from_pdfs(pdfs)
+            chunks = make_chunks(raw_text)
+            vectorization(chunks)
+        st.session_state.processed = True
+        st.rerun()
+
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    for chat in st.session_state.chat_history:
+        role = chat["role"]
+        content = chat["content"]
+        prefix = "👤" if role == "user" else "🤖"
+        with st.chat_message(role):
+            st.markdown(f"{prefix}  {content}")
+
+    user_input = st.chat_input("Ask a question about the uploaded PDF(s):")
+    if user_input:
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.markdown(f"👤  {user_input}")
+        with st.spinner("🧠 Thinking..."):
+            answer = get_bot_response(user_input, st.session_state.chat_history)
+        st.session_state.chat_history.append({"role": "assistant", "content": answer})
+        with st.chat_message("assistant"):
+            st.markdown(f"🤖  {answer}")
+
+
+if __name__ == "__main__":
+    main()
