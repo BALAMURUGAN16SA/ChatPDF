@@ -208,7 +208,7 @@ def main():
         with st.chat_message(role):
             st.markdown(f"{prefix}  {content}")
 
-    user_input = st.chat_input("Ask a question about the uploaded PDF(s):")
+    user_input = st.chat_input("Ask a question about the PDF(s):")
     if user_input:
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
