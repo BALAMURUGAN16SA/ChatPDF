@@ -17,9 +17,7 @@ from langchain.prompts import PromptTemplate
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-pytesseract.pytesseract.tesseract_cmd = shutil.which("Tesseract-OCR")
-if not pytesseract.pytesseract.tesseract_cmd:
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
 
 def extract_texts_from_pdfs(pdfs):
     texts = ""
