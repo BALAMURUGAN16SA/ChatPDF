@@ -3,8 +3,11 @@ google-generativeai
 python-dotenv
 langchain
 PyPDF2
+pytesseract
+pymupdf
+pillow
 chromadb
 faiss-cpu
 langchain_google_genai
 langchain_community
-duckduckgo_search
+ddgs
