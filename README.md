@@ -4,7 +4,6 @@ A powerful, context-aware PDF question-answering app built using **Streamlit**, 
 
 **APP LINK** - https://dbaas-chat-pdf.streamlit.app/
 
-I know I shouldn't have uploaded .env here. But seems like it is the best way to avoid *GoogleGenerativeAIError: Error embedding content: 504 Deadline Exceeded*. 
 ---
 
 ## Directory Structure
