@@ -53,7 +53,7 @@ def make_chunks(texts):
 
 def vectorization(chunks):
     if not chunks:
-        st.error("No text chunks to embed. Please upload PDFs with extractable text.")
+        st.error("No text chunks to embed. Please upload PDFs with extractable text. (Try uploading Text PDF or Properly Scanned PDF)")
         return None
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     try:
@@ -233,7 +233,7 @@ def main():
     st.markdown('<div class="title-bar">💬 Dbaas - ChatPDF</div>', unsafe_allow_html=True)
 
     if "pdfs" not in st.session_state or not st.session_state["pdfs"]:
-        st.markdown("📂 Upload docs using the button in sidebar")
+        st.markdown("📂 Upload docs using the button in sidebar. Works on both Text PDF and Scanned PDF (OCR Included)")
 
     with st.sidebar:
         st.header("📁 Upload PDFs")
@@ -263,7 +263,7 @@ def main():
             raw_text = extract_texts_from_pdfs(st.session_state["pdfs"])
             chunks = make_chunks(raw_text)
             if not chunks:
-                st.error("No text chunks generated from the uploaded PDFs. PDF may consist only Photos, wi")
+                st.error("No text chunks generated from the uploaded PDFs. PDF may consist disorted Photos, which can't be extracted by OCR.")
                 return
             vector = vectorization(chunks)
             if vector is None:
