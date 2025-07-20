@@ -1,6 +1,4 @@
-import os
 import io
-from dotenv import load_dotenv
 from ddgs import DDGS
 import streamlit as st
 from PyPDF2 import PdfReader
@@ -15,8 +13,7 @@ from langchain_community.vectorstores.faiss import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 
-load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+genai.configure(api_key=st.secrets["api"]["gemini_key"])
 pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
 
 def extract_texts_from_pdfs(pdfs):
