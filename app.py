@@ -13,7 +13,7 @@ from langchain_community.vectorstores.faiss import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 
-genai.configure(api_key=st.secrets["api"]["gemini_key"])
+genai.configure(api_key="AIzaSyBNPcBZXggVfZhDbRwGC5buTAuhZ8mEVWU")
 pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
 
 def extract_texts_from_pdfs(pdfs):
