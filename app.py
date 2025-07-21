@@ -52,7 +52,7 @@ def vectorization(chunks):
     if not chunks:
         st.error("No text chunks to embed. Please upload PDFs with extractable text. (Try uploading Text PDF or Properly Scanned PDF)")
         return None
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=st.secrets["api"]["gemini_key"])
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     try:
         vector = FAISS.from_texts(chunks, embedding=embeddings)
     except IndexError:
