@@ -278,7 +278,7 @@ def main():
         else:
             st.session_state.summary_request_count += 1
 
-        summary_question = f"summarize the document (request {st.session_state.summary_request_count})"
+        summary_question = f"summarize the document (req {st.session_state.summary_request_count})"
 
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
