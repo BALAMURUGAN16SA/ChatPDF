@@ -234,7 +234,7 @@ def main():
                     📂 Add docs via **sidebar**\n
                     🔍 Handles **Text** & **Scanned** PDFs (OCR inside)\n
                     🚫 **No SignUp** required\n
-                    🛡️ Your doc is **never saved** anywhere online\n
+                    🛡️ Your docs are **never saved** anywhere online\n
                     """)
 
 
