@@ -231,7 +231,7 @@ def main():
 
     if "pdfs" not in st.session_state or not st.session_state["pdfs"]:
         st.markdown("""
-                    📂 Add docs via **sidebar**
+                    📂 Add docs via **sidebar**\n
                     🔍 Works on both **Text** and **Scanned** PDFs (OCR included)  
                     🚫 **No SignUp** required  
                     🛡️ Your doc is **never saved** anywhere online
