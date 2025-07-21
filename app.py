@@ -230,7 +230,10 @@ def main():
     st.markdown('<div class="title-bar">💬 Dbaas - ChatPDF</div>', unsafe_allow_html=True)
 
     if "pdfs" not in st.session_state or not st.session_state["pdfs"]:
-        st.markdown("📂 Upload docs using the button in sidebar. Works on both Text PDF and Scanned PDF (OCR Included)")
+        st.markdown("""📂 Upload docs using the button in sidebar\n
+                       🔍 Works on both Text PDF and Scanned PDF (OCR Included)\n
+                       🚫 No SignUp required\n
+                       🔒 Don't worry, your document is *never saved* anywhere online.""")
 
     with st.sidebar:
         st.header("📁 Upload PDFs")
