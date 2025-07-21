@@ -230,13 +230,7 @@ def main():
     st.markdown('<div class="title-bar">💬 Dbaas - ChatPDF</div>', unsafe_allow_html=True)
 
     if "pdfs" not in st.session_state or not st.session_state["pdfs"]:
-        st.markdown("""
-                    📂 Add docs via **sidebar**\n
-                    🔍 Handles **Text** & **Scanned** PDFs (OCR inside)\n
-                    🚫 **No SignUp** required\n
-                    🛡️ Your docs are **never saved** anywhere online\n
-                    """)
-
+        st.markdown("📂 Upload docs using the button in sidebar. Works on both Text PDF and Scanned PDF (OCR Included)")
 
     with st.sidebar:
         st.header("📁 Upload PDFs")
@@ -278,7 +272,7 @@ def main():
         else:
             st.session_state.summary_request_count += 1
 
-        summary_question = f"summarize the document (req {st.session_state.summary_request_count})"
+        summary_question = f"summarize the document (request {st.session_state.summary_request_count})"
 
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
