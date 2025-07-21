@@ -1,6 +1,4 @@
-import os
 import io
-from dotenv import load_dotenv
 from ddgs import DDGS
 import streamlit as st
 from PyPDF2 import PdfReader
@@ -15,8 +13,7 @@ from langchain_community.vectorstores.faiss import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 
-load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+genai.configure(api_key=st.secrets["api"]["gemini_key"])
 pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
 
 def extract_texts_from_pdfs(pdfs):
@@ -233,8 +230,13 @@ def main():
     st.markdown('<div class="title-bar">💬 Dbaas - ChatPDF</div>', unsafe_allow_html=True)
 
     if "pdfs" not in st.session_state or not st.session_state["pdfs"]:
-        st.markdown("📂 Upload docs using the button in sidebar. Works on both Text PDF and Scanned PDF (OCR Included)")
-
+        st.markdown("""
+                    📂 Add docs via **sidebar**\n
+                    🔍 Handles **Text** & **Scanned** PDFs (OCR inside)\n
+                    🚫 **No SignUp** required\n
+                    🛡️ Your docs are **never saved** anywhere online\n
+                    """)
+        
     with st.sidebar:
         st.header("📁 Upload PDFs")
         uploaded_pdfs = st.file_uploader("Choose PDF files", type="pdf", accept_multiple_files=True)
