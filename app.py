@@ -234,7 +234,7 @@ def main():
                     📂 **Upload** documents using the button in the **sidebar**  
                     🔍 Works on both **Text PDFs** and **Scanned PDFs** (OCR included)  
                     🚫 **No SignUp** required  
-                    🔒 Your document is **never saved** anywhere online
+                     &#128274; Your document is **never saved** anywhere online
                     """)
 
 
