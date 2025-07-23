@@ -2,7 +2,7 @@
 
 A powerful, context-aware PDF question-answering app built using **Streamlit**, **LangChain**, **FAISS**, and **Google Gemini Pro** via `langchain-google-genai`. Upload any PDF, ask questions, and get accurate answers based on the document's actual content.
 
-**APP LINK** - https://dbaas-chat-pdf.streamlit.app/
+**APP LINK** - https://balamurugan16sas-chatpdfs.streamlit.app/ - Deployed with streamlit cloud
 
 ---
 
