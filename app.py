@@ -230,9 +230,9 @@ def set_custom_style():
 
 def main():
     set_custom_style()
-    st.set_page_config(page_title="Dbaas - ChatPDF", page_icon="📄")
+    st.set_page_config(page_title="Bala - ChatPDFs", page_icon="📄")
 
-    st.markdown('<div class="title-bar">💬 Dbaas - ChatPDF</div>', unsafe_allow_html=True)
+    st.markdown('<div class="title-bar">💬 Bala - ChatPDFs</div>', unsafe_allow_html=True)
 
     if "pdfs" not in st.session_state or not st.session_state["pdfs"]:
         st.markdown("""
