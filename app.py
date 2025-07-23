@@ -244,7 +244,7 @@ def main():
         st.markdown("""
                     📂 Add docs via **sidebar**\n
                     🔍 Handles **Text** & **Scanned** PDFs (OCR inside)\n
-                    🧠 Context aware responses\n
+                    🧠 **Context aware** responses\n
                     🚫 **No SignUp** required\n
                     🛡️ Your docs are **never saved** anywhere online\n
                     """)
