@@ -20,7 +20,7 @@ from langchain.prompts import PromptTemplate
 
 # genai.configure(api_key=st.secrets["api"]["gemini_key"])
 
-"""Google API Initialization requires API to be set up securely using os"""
+# Google API Initialization requires API to be set up securely using os.
 
 import os
 os.environ["GOOGLE_API_KEY"] = st.secrets["api"]["gemini_key"]
