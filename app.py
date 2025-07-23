@@ -18,6 +18,7 @@ from langchain.prompts import PromptTemplate
 # load_dotenv()
 # genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
+import os
 st.write("Secrets loaded:", st.secrets)
 os.environ["GOOGLE_API_KEY"] = st.secrets["api"]["gemini_key"]
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
