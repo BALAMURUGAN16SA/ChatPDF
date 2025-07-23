@@ -18,12 +18,14 @@ from langchain.prompts import PromptTemplate
 # load_dotenv()
 # genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
+# genai.configure(api_key=st.secrets["api"]["gemini_key"])
+
+"""Google API Initialization requires API to be set up securely using os"""
+
 import os
 st.write("Secrets loaded:", st.secrets)
 os.environ["GOOGLE_API_KEY"] = st.secrets["api"]["gemini_key"]
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-
-# genai.configure(api_key=st.secrets["api"]["gemini_key"])
 pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
 
 def extract_texts_from_pdfs(pdfs):
