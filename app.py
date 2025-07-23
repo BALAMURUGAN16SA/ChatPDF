@@ -23,7 +23,6 @@ from langchain.prompts import PromptTemplate
 """Google API Initialization requires API to be set up securely using os"""
 
 import os
-st.write("Secrets loaded:", st.secrets)
 os.environ["GOOGLE_API_KEY"] = st.secrets["api"]["gemini_key"]
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
