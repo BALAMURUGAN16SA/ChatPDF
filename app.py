@@ -27,68 +27,6 @@ os.environ["GOOGLE_API_KEY"] = st.secrets["api"]["gemini_key"]
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
 
-class ConversationMemory:
-    def __init__(self):
-        self.conversation_chunks = []
-        self.conversation_vector = None
-        self.embeddings_model = None
-    
-    def initialize_embeddings(self):
-        """Initialize embeddings model if not already done"""
-        if self.embeddings_model is None:
-            self.embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    
-    def add_exchange(self, question, answer):
-        """Add Q&A pair to conversation memory"""
-        # Clean answer (remove cache markers and truncate if too long)
-        clean_answer = answer.replace("[cached]", "").strip()
-        if len(clean_answer) > 800:
-            clean_answer = clean_answer[:800] + "..."
-        
-        # Create exchange chunk
-        exchange = f"Previous Question: {question}\nPrevious Answer: {clean_answer}"
-        self.conversation_chunks.append(exchange)
-        
-        # Keep only last 15 exchanges to prevent memory bloat
-        if len(self.conversation_chunks) > 15:
-            self.conversation_chunks = self.conversation_chunks[-15:]
-        
-        # Rebuild conversation vector store
-        self._rebuild_conversation_vector()
-    
-    def _rebuild_conversation_vector(self):
-        """Rebuild the conversation vector store with current chunks"""
-        if not self.conversation_chunks:
-            self.conversation_vector = None
-            return
-        
-        try:
-            self.initialize_embeddings()
-            self.conversation_vector = FAISS.from_texts(
-                self.conversation_chunks, 
-                embedding=self.embeddings_model
-            )
-        except Exception as e:
-            st.error(f"Error building conversation vector: {str(e)}")
-            self.conversation_vector = None
-    
-    def get_relevant_context(self, current_question, top_k=3):
-        """Retrieve relevant past conversations"""
-        if not self.conversation_vector or not self.conversation_chunks:
-            return ""
-        
-        try:
-            relevant_convs = self.conversation_vector.similarity_search(current_question, k=top_k)
-            context_parts = []
-            
-            for i, doc in enumerate(relevant_convs, 1):
-                context_parts.append(f"Relevant Past Exchange {i}:\n{doc.page_content}")
-            
-            return "\n\n".join(context_parts)
-        except Exception as e:
-            st.error(f"Error retrieving conversation context: {str(e)}")
-            return ""
-
 def extract_texts_from_pdfs(pdfs):
     texts = ""
 
@@ -115,6 +53,8 @@ def extract_texts_from_pdfs(pdfs):
 
     return texts
 
+
+
 def make_chunks(texts):
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     return splitter.split_text(texts)
@@ -132,78 +72,19 @@ def vectorization(chunks):
     vector.save_local("faiss_index")
     return vector
 
-def get_contextualized_query(question, chat_history, max_history=4):
-    """Expand current query with relevant context from chat history"""
-    if not chat_history:
-        return question
-    
-    # Get last few exchanges for context
-    recent_context = []
-    for msg in chat_history[-max_history*2:]:  # *2 because user+assistant pairs
-        if msg['role'] == 'user':
-            recent_context.append(f"Recent question: {msg['content']}")
-        elif msg['role'] == 'assistant' and not msg['content'].startswith('[cached]'):
-            # Extract key points from previous answers (first 150 chars)
-            clean_answer = msg['content'].replace("[cached]", "").strip()
-            recent_context.append(f"Recent context: {clean_answer[:150]}...")
-    
-    if recent_context:
-        context_str = "\n".join(recent_context[-4:])  # Last 4 context items
-        expanded_query = f"{question}\n\nConversation context:\n{context_str}"
-        return expanded_query
-    
-    return question
 
-def conversational_chain_enhanced():
-    """Enhanced prompt template with conversation memory"""
+def conversational_chain():
     prompt_template = """
-    You are a helpful assistant answering questions about uploaded documents. Use the provided context to give accurate, detailed responses.
-
-    DOCUMENT CONTEXT:
-    {context}
-
-    RELEVANT PAST CONVERSATIONS:
-    {conversation_context}
-
-    RECENT CHAT HISTORY:
-    {chat_history}
-
-    CURRENT QUESTION: {question}
-
-    Instructions:
-    1. First check if the question can be answered using the DOCUMENT CONTEXT
-    2. Use RELEVANT PAST CONVERSATIONS to understand context and avoid repeating information
-    3. Reference previous discussions when relevant (e.g., "As we discussed earlier..." or "Building on our previous conversation...")
-    4. If you cannot find the answer in the provided documents, respond with "WEB_SEARCH_FALLBACK"
-    5. Be conversational and acknowledge the ongoing discussion flow
-    6. Provide detailed, comprehensive answers when possible
-
+    Answer the question as detailed as possible using the provided context and previous conversation history.
+    If the answer is not in the provided context, just say "WEB_SEARCH_FALLBACK".
+    Previous Conversation:{chat_history}
+    Context: {context}
+    Question: {question}
     Answer:
     """
-    
-    prompt = PromptTemplate(
-        template=prompt_template, 
-        input_variables=["context", "question", "chat_history", "conversation_context"]
-    )
+    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question", "chat_history"])
     model = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite-preview-06-17", temperature=0.3)
     return load_qa_chain(model, chain_type="stuff", prompt=prompt)
-
-def format_recent_history(chat_history, max_exchanges=2):
-    """Format recent chat history for prompt"""
-    if not chat_history:
-        return "No previous conversation."
-    
-    formatted = []
-    recent_messages = chat_history[-(max_exchanges*2):]  # Get last N exchanges
-    
-    for msg in recent_messages:
-        role = "Human" if msg['role'] == 'user' else "Assistant"
-        content = msg['content'].replace("[cached]", "").strip()
-        if len(content) > 200:
-            content = content[:200] + "..."
-        formatted.append(f"{role}: {content}")
-    
-    return "\n".join(formatted)
 
 def get_web_response(question, chat_history):
     try:
@@ -219,6 +100,14 @@ def get_web_response(question, chat_history):
             if not results:
                 return None
                 
+            formatted_results = []
+            for result in results:
+                formatted_results.append(
+                    f"### {result['title']}\n\n"
+                    f"{result['body']}\n\n"
+                    f"[Read more]({result['href']})"
+                )
+            
             formatted_response = (
                 "⚠️ Could not find in PDFs. Here are relevant web results:\n\n"
                 f"*{results[0]['body']}*\n\n"
@@ -231,59 +120,77 @@ def get_web_response(question, chat_history):
         print(f"Web search failed: {str(e)}")
         return None
 
-def get_bot_response(question, chat_history):
-    """Enhanced context-aware response generation with conversation memory"""
+def get_context_enhanced_query(current_question, chat_history):
+    """
+    Enhance the current question by appending the last 4 user questions for better context
+    """
+    # Extract only user questions from chat history
+    user_questions = [
+        msg['content'] for msg in chat_history 
+        if msg['role'] == 'user' and not msg['content'].startswith('summarize the document')
+    ]
     
-    # Initialize session state components
+    # Get last 4 user questions (excluding the current one that hasn't been added yet)
+    last_4_questions = user_questions[-4:] if len(user_questions) >= 4 else user_questions
+    
+    # Create enhanced query
+    if last_4_questions:
+        context_questions = " | ".join(last_4_questions)
+        enhanced_query = f"Previous context: {context_questions} | Current question: {current_question}"
+    else:
+        enhanced_query = current_question
+    
+    return enhanced_query
+
+def get_bot_response(question, chat_history):
     if "query_cache" not in st.session_state:
         st.session_state["query_cache"] = {}
-    if "conversation_memory" not in st.session_state:
-        st.session_state["conversation_memory"] = ConversationMemory()
 
-    # Check cache first (with contextualized key)
-    cache_key = f"{question.strip().lower()}_{len(chat_history)}"
+    # Create cache key from original question only
+    cache_key = question.strip().lower()
     if cache_key in st.session_state["query_cache"]:
         cached_answer = st.session_state["query_cache"][cache_key]
         if not cached_answer.startswith("[cached]"):
             return f"[cached] {cached_answer}"
         return cached_answer
     
-    # 1. Create contextualized query for better retrieval
-    contextualized_query = get_contextualized_query(question, chat_history)
+    # Enhance the query with context from last 4 questions
+    enhanced_query = get_context_enhanced_query(question, chat_history)
     
-    # 2. Search document vector store
+    # Use enhanced query for embedding search
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     vectorstore = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     
-    # Search documents with contextualized query
-    docs_and_scores = vectorstore.similarity_search_with_score(contextualized_query, k=8)
+    # Search using the enhanced query that includes context
+    docs_and_scores = vectorstore.similarity_search_with_score(enhanced_query, k=10)
     docs = [doc for doc, _ in docs_and_scores]
     
-    # 3. Get relevant conversation context
-    conv_memory = st.session_state["conversation_memory"]
-    relevant_conv_context = conv_memory.get_relevant_context(question, top_k=3)
+    # Format chat history for the prompt
+    formatted_chat_history = ""
+    if chat_history:
+        # Get last 6 messages for context (3 Q&A pairs)
+        recent_history = chat_history[-6:]
+        for msg in recent_history:
+            role = "User" if msg['role'] == 'user' else "Assistant"
+            formatted_chat_history += f"{role}: {msg['content']}\n"
     
-    # 4. Generate response with enhanced context
-    chain = conversational_chain_enhanced()
+    chain = conversational_chain()
     response = chain({
         "input_documents": docs,
-        "question": question,
-        "chat_history": format_recent_history(chat_history, max_exchanges=2),
-        "conversation_context": relevant_conv_context if relevant_conv_context else "No relevant past conversations."
+        "question": question,  # Use original question for the final response
+        "chat_history": formatted_chat_history
     }, return_only_outputs=True)
 
-    # 5. Handle fallback to web search
     if "WEB_SEARCH_FALLBACK" in response["output_text"]:
         web_response = get_web_response(question, chat_history)
         final_response = web_response if web_response else response["output_text"]
     else:
         final_response = response["output_text"]
     
-    # 6. Update conversation memory and cache
-    conv_memory.add_exchange(question, final_response)
+    # Cache using original question as key
     st.session_state["query_cache"][cache_key] = final_response
-    
     return final_response
+
 
 def set_custom_style():
     st.markdown(
@@ -362,15 +269,6 @@ def set_custom_style():
         resize: vertical;
         min-height: 50px;
     }
-    .context-info {
-        background-color: #1a1a1a;
-        border-left: 3px solid #00755E;
-        padding: 10px;
-        margin: 10px 0;
-        border-radius: 4px;
-        font-size: 12px;
-        color: #cccccc;
-    }
 </style>
 """,
         unsafe_allow_html=True,
@@ -378,16 +276,15 @@ def set_custom_style():
 
 def main():
     set_custom_style()
-    st.set_page_config(page_title="Bala - Context-Aware ChatPDFs", page_icon="📄")
+    st.set_page_config(page_title="Bala - ChatPDFs", page_icon="📄")
 
-    st.markdown('<div class="title-bar">💬 Bala - Context-Aware ChatPDFs</div>', unsafe_allow_html=True)
+    st.markdown('<div class="title-bar">💬 Bala - ChatPDFs</div>', unsafe_allow_html=True)
 
     if "pdfs" not in st.session_state or not st.session_state["pdfs"]:
         st.markdown("""
                     📂 Add docs via **sidebar**\n
                     🔍 Handles **Text** & **Scanned** PDFs (OCR inside)\n
-                    🧠 **Context aware** responses with conversation memory\n
-                    🔄 **Remembers** previous questions and answers\n
+                    🧠 **Context aware** responses with last 4 questions\n
                     🚫 **No SignUp** required\n
                     🛡️ Your docs are **never saved** anywhere online\n
                     """)
@@ -407,44 +304,36 @@ def main():
             if "pdfs" in st.session_state:
                 del st.session_state["pdfs"]
 
+
         process = st.button("Process Documents", key="process_button")
 
         if "processed" in st.session_state and st.session_state.processed:
             st.success("✅ Documents processed and indexed!")
-            
-            # Show conversation memory stats
-            if "conversation_memory" in st.session_state:
-                conv_memory = st.session_state["conversation_memory"]
-                num_exchanges = len(conv_memory.conversation_chunks)
-                if num_exchanges > 0:
-                    st.info(f"💭 Conversation memory: {num_exchanges} exchanges stored")
 
         st.markdown("---")
         
-        # Add conversation memory controls
-        if "conversation_memory" in st.session_state and st.session_state["conversation_memory"].conversation_chunks:
-            st.subheader("🧠 Memory Controls")
-            if st.button("Clear Conversation Memory", key="clear_memory"):
-                st.session_state["conversation_memory"] = ConversationMemory()
-                st.session_state["query_cache"] = {}
-                st.success("Memory cleared!")
-                st.rerun()
+        # Add context information in sidebar
+        if "chat_history" in st.session_state:
+            user_questions = [
+                msg['content'] for msg in st.session_state.chat_history 
+                if msg['role'] == 'user' and not msg['content'].startswith('summarize the document')
+            ]
+            if len(user_questions) > 0:
+                st.markdown("### 🧠 Context Tracking")
+                st.markdown(f"**Questions asked:** {len(user_questions)}")
+                st.markdown(f"**Context window:** Last {min(4, len(user_questions))} questions")
 
     if "pdfs" in st.session_state and st.session_state["pdfs"] and process:
         with st.spinner("📝 Processing PDFs and building index..."):
             raw_text = extract_texts_from_pdfs(st.session_state["pdfs"])
             chunks = make_chunks(raw_text)
             if not chunks:
-                st.error("No text chunks generated from the uploaded PDFs. PDF may consist distorted Photos, which can't be extracted by OCR.")
+                st.error("No text chunks generated from the uploaded PDFs. PDF may consist disorted Photos, which can't be extracted by OCR.")
                 return
             vector = vectorization(chunks)
             if vector is None:
                 return
         st.session_state.processed = True
-
-        # Reset conversation memory when new documents are processed
-        st.session_state["conversation_memory"] = ConversationMemory()
-        st.session_state["query_cache"] = {}
 
         if "summary_request_count" not in st.session_state:
             st.session_state.summary_request_count = 1
@@ -461,6 +350,7 @@ def main():
         st.session_state.chat_history.append({"role": "assistant", "content": answer})
         st.rerun()
 
+
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
@@ -476,7 +366,7 @@ def main():
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.markdown(f"👤  {user_input}")
-        with st.spinner("🧠 Thinking..."):
+        with st.spinner("🧠 Thinking with context..."):
             answer = get_bot_response(user_input, st.session_state.chat_history)
         st.session_state.chat_history.append({"role": "assistant", "content": answer})
         with st.chat_message("assistant"):
